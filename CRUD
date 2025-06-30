@@ -1,0 +1,144 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+
+public class CRUDForm extends JFrame {
+    private Connection conn;
+    private JTable table;
+    private DefaultTableModel model;
+    private JTextField fName, fEmail, fPhone;
+    private JButton bCreate, bUpdate, bDelete, bRefresh;
+    private int selectedId = -1;
+
+    public CRUDForm() {
+        super("CRUD My Access DB");
+        initDB();
+        initUI();
+        loadData();
+    }
+
+    private void initDB() {
+        try {
+            Class.forName("net.ucanaccess.jdbc.UcanaccessDriver");
+            String url = "jdbc:ucanaccess://" + new java.io.File("data.accdb").getAbsolutePath();
+            conn = DriverManager.getConnection(url);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "DB Error: " + ex.getMessage());
+            System.exit(1);
+        }
+    }
+
+    private void initUI() {
+        model = new DefaultTableModel(new String[]{"ID","Name","Email","Phone"},0);
+        table = new JTable(model);
+        JScrollPane sp = new JScrollPane(table);
+
+        fName = new JTextField(15);
+        fEmail = new JTextField(15);
+        fPhone = new JTextField(10);
+        bCreate = new JButton("Create");
+        bUpdate = new JButton("Update");
+        bDelete = new JButton("Delete");
+        bRefresh = new JButton("Refresh");
+
+        JPanel pForm = new JPanel();
+        pForm.add(new JLabel("Name:")); pForm.add(fName);
+        pForm.add(new JLabel("Email:")); pForm.add(fEmail);
+        pForm.add(new JLabel("Phone:")); pForm.add(fPhone);
+        pForm.add(bCreate); pForm.add(bUpdate); pForm.add(bDelete); pForm.add(bRefresh);
+
+        setLayout(new BorderLayout());
+        add(sp, BorderLayout.CENTER);
+        add(pForm, BorderLayout.SOUTH);
+
+        setSize(600,400);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        bCreate.addActionListener(e -> create());
+        bUpdate.addActionListener(e -> update());
+        bDelete.addActionListener(e -> delete());
+        bRefresh.addActionListener(e -> loadData());
+        table.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting() && table.getSelectedRow() != -1) {
+                int row = table.getSelectedRow();
+                selectedId = Integer.parseInt(model.getValueAt(row,0).toString());
+                fName.setText(model.getValueAt(row,1).toString());
+                fEmail.setText(model.getValueAt(row,2).toString());
+                fPhone.setText(model.getValueAt(row,3).toString());
+            }
+        });
+    }
+
+    private void loadData() {
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM contacts")) {
+            model.setRowCount(0);
+            while (rs.next()) {
+                model.addRow(new Object[]{
+                    rs.getInt("id"), rs.getString("name"),
+                    rs.getString("email"), rs.getString("phone")
+                });
+            }
+        } catch (SQLException ex) {
+            showErr(ex);
+        }
+    }
+
+    private void create() {
+        String sql = "INSERT INTO contacts (name,email,phone) VALUES (?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, fName.getText());
+            ps.setString(2, fEmail.getText());
+            ps.setString(3, fPhone.getText());
+            ps.executeUpdate();
+            loadData();
+            clearFields();
+        } catch (SQLException ex) {
+            showErr(ex);
+        }
+    }
+
+    private void update() {
+        if (selectedId < 0) return;
+        String sql = "UPDATE contacts SET name=?,email=?,phone=? WHERE id=?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, fName.getText());
+            ps.setString(2, fEmail.getText());
+            ps.setString(3, fPhone.getText());
+            ps.setInt(4, selectedId);
+            ps.executeUpdate();
+            loadData();
+        } catch (SQLException ex) {
+            showErr(ex);
+        }
+    }
+
+    private void delete() {
+        if (selectedId < 0) return;
+        String sql = "DELETE FROM contacts WHERE id=?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, selectedId);
+            ps.executeUpdate();
+            loadData();
+            clearFields();
+        } catch (SQLException ex) {
+            showErr(ex);
+        }
+    }
+
+    private void clearFields() {
+        fName.setText(""); fEmail.setText(""); fPhone.setText("");
+        selectedId = -1;
+    }
+
+    private void showErr(SQLException ex) {
+        JOptionPane.showMessageDialog(this, "SQL Error: " + ex.getMessage());
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new CRUDForm().setVisible(true));
+    }
+}
