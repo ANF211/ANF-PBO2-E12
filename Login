@@ -1,0 +1,84 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+
+public class LoginForm extends JFrame {
+    private JTextField txtUser;
+    private JPasswordField txtPass;
+    private JButton btnLogin;
+    private Connection conn;
+    
+    public LoginForm() {
+        super("Login Form - Java + Access");
+        initUI();
+        initDB();
+    }
+    
+    private void initUI() {
+        txtUser = new JTextField(20);
+        txtPass = new JPasswordField(20);
+        btnLogin = new JButton("Login");
+        
+        JPanel panel = new JPanel(new GridBagLayout());
+        var gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5,5,5,5);
+        gbc.gridx=0; gbc.gridy=0; panel.add(new JLabel("Username:"), gbc);
+        gbc.gridx=1; panel.add(txtUser, gbc);
+        gbc.gridx=0; gbc.gridy=1; panel.add(new JLabel("Password:"), gbc);
+        gbc.gridx=1; panel.add(txtPass, gbc);
+        gbc.gridy=2; gbc.gridwidth=2; panel.add(btnLogin, gbc);
+        
+        add(panel);
+        pack();
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        
+        btnLogin.addActionListener(e -> login());
+    }
+    
+    private void initDB() {
+        try {
+            Class.forName("net.ucanaccess.jdbc.UcanaccessDriver");
+            String path = "C:/Database/login.accdb";
+            conn = DriverManager.getConnection("jdbc:ucanaccess://" + path);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "DB Error: " + ex.getMessage(), 
+                                          "Error", JOptionPane.ERROR_MESSAGE);
+            System.exit(1);
+        }
+    }
+    
+    private void login() {
+        String user = txtUser.getText().trim();
+        String pass = new String(txtPass.getPassword()).trim();
+        
+        if (user.isEmpty() || pass.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Isi semua kolom!", "Peringatan",
+                                          JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        String sql = "SELECT COUNT(*) FROM Users WHERE Username = ? AND Password = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, user);
+            ps.setString(2, pass);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next() && rs.getInt(1) > 0) {
+                JOptionPane.showMessageDialog(this, "Login Berhasil!", "Sukses",
+                                              JOptionPane.INFORMATION_MESSAGE);
+                // lanjutkan aplikasi...
+            } else {
+                JOptionPane.showMessageDialog(this, "Login Gagal!", "Error",
+                                              JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Query Error: " + ex.getMessage(), 
+                                          "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
+    }
+}
